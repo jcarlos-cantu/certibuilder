@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificado Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        .drop-zone.dragover { border-color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
+        .field-marker {
+            position: absolute;
+            border: 2px dashed #3b82f6;
+            background: rgba(59, 130, 246, 0.15);
+            cursor: move;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            z-index: 10;
+        }
+        .field-marker.selected {
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.2);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3);
+        }
+        .field-marker.name { border-color: #3b82f6; background: rgba(59, 130, 246, 0.15); }
+        .field-marker.photo { border-color: #22c55e; background: rgba(34, 197, 94, 0.15); }
+        .field-marker.category { border-color: #a855f7; background: rgba(168, 85, 247, 0.15); }
+        .canvas-container { position: relative; display: inline-block; line-height: 0; }
+        .canvas-container img { display: block; max-width: 100%; }
+    </style>
+</head>
+<body class="bg-gray-950 text-white min-h-screen">
+    <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <i class="fa-solid fa-certificate text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold">Certificado Builder</h1>
+                    <p class="text-gray-500 text-sm">Crea plantillas interactivas</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="btn-preview" class="hidden px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition">
+                    <i class="fa-solid fa-eye mr-2"></i>Vista Previa
+                </button>
+                <button id="btn-export" disabled class="px-5 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg font-semibold transition">
+                    <i class="fa-solid fa-download mr-2"></i>Exportar HTML
+                </button>
+                <button id="btn-back" class="hidden px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition">
+                    <i class="fa-solid fa-arrow-left mr-2"></i>Volver
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Step 1 -->
+        <section id="step1" class="mb-10">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                <h2 class="text-xl font-semibold">Subi tu plantilla</h2>
+            </div>
+            <div id="drop-zone" class="drop-zone border-2 border-dashed border-gray-700 rounded-2xl p-12 text-center cursor-pointer hover:border-gray-600 transition relative">
+                <input type="file" id="image-input" accept="image/*" class="hidden">
+                <div id="upload-prompt">
+                    <div class="w-20 h-20 mx-auto mb-4 bg-gray-800 rounded-full flex items-center justify-center">
+                        <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-500"></i>
+                    </div>
+                    <p class="text-lg font-medium mb-2">Arrastra la imagen aca</p>
+                    <p class="text-gray-500 mb-4">o usa el boton de abajo</p>
+                    <label for="image-input" class="mt-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition inline-flex items-center gap-2 cursor-pointer">
+                        <i class="fa-solid fa-folder-open"></i>Seleccionar imagen
+                    </label>
+                </div>
+                <div id="loading" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-gray-950/95 rounded-2xl">
+                    <div class="w-16 h-16 mb-4 border-4 border-gray-700 border-t-blue-500 rounded-full animate-spin"></div>
+                    <p class="text-lg font-medium">Procesando...</p>
+                </div>
+                <div id="preview-container" class="hidden">
+                    <img id="preview-img" class="max-w-md rounded-xl shadow-2xl mx-auto">
+                    <p class="text-gray-500 text-sm mt-4">Imagen cargada! Ya podes usar el paso 2.</p>
+                    <label for="image-input" class="mt-3 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm inline-flex items-center gap-2 cursor-pointer">
+                        <i class="fa-solid fa-arrow-right"></i>Cambiar imagen
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 2 -->
+        <section id="step2" class="mb-10 hidden">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                <h2 class="text-xl font-semibold">Agrega campos interactivos</h2>
+            </div>
+            <div class="grid lg:grid-cols-4 gap-6">
+                <div class="lg:col-span-3">
+                    <div class="bg-gray-900 rounded-2xl p-6 mb-6">
+                        <p class="text-gray-400 text-sm mb-4">Selecciona tipo y hace clic en la imagen para posicionar</p>
+                        <div class="flex flex-wrap gap-3">
+                            <button data-type="name" class="type-btn px-5 py-3 bg-blue-600 rounded-xl font-medium transition ring-2 ring-blue-500">
+                                <i class="fa-solid fa-pen mr-2"></i>Nombre
+                            </button>
+                            <button data-type="photo" class="type-btn px-5 py-3 bg-green-600 hover:bg-green-500 rounded-xl font-medium transition">
+                                <i class="fa-solid fa-camera mr-2"></i>Foto
+                            </button>
+                            <button data-type="category" class="type-btn px-5 py-3 bg-purple-600 hover:bg-purple-500 rounded-xl font-medium transition">
+                                <i class="fa-solid fa-trophy mr-2"></i>Categoria
+                            </button>
+                        </div>
+                        <div class="mt-5 pt-5 border-t border-gray-800 flex items-center gap-4">
+                            <span class="text-gray-400 text-sm">Zoom</span>
+                            <input type="range" id="zoom-slider" min="25" max="200" value="100" class="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500" disabled>
+                            <span id="zoom-val" class="text-white font-mono text-sm w-12 text-right">100%</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-900 rounded-2xl p-6">
+                        <div id="canvas-container" style="line-height: 0; position: relative; display: inline-block;">
+                            <img id="template-img" style="width: auto; height: auto; max-width: 100%; max-height: 70vh;">
+                            <div id="fields-layer" class="absolute" style="top: 0; left: 0; pointer-events: none;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="field-props" class="bg-gray-900 rounded-2xl p-6 hidden">
+                    <h3 class="text-lg font-semibold mb-4">Propiedades</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Tipo</label>
+                            <span id="prop-type" class="px-3 py-2 bg-gray-800 rounded-lg text-white block"></span>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Ancho: <span id="prop-w-val" class="text-white">200</span>px</label>
+                            <input type="range" id="prop-w" min="20" max="1200" value="200" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Alto: <span id="prop-h-val" class="text-white">40</span>px</label>
+                            <input type="range" id="prop-h" min="20" max="600" value="40" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                        </div>
+                        <div id="text-props" class="hidden">
+                            <div class="mb-3">
+                                <label class="block text-sm text-gray-400 mb-1">Color texto</label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="prop-color" value="#ffffff" class="w-12 h-10 rounded cursor-pointer">
+                                    <input type="text" id="prop-color-text" value="#ffffff" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="block text-sm text-gray-400 mb-1">Fuente</label>
+                                <select id="prop-font" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                                    <option value="system-ui">System UI</option>
+                                    <option value="Arial">Arial</option>
+                                    <option value="Georgia">Georgia</option>
+                                    <option value="Times New Roman">Times New Roman</option>
+                                    <option value="Courier New">Courier New</option>
+                                    <option value="Verdana">Verdana</option>
+                                    <option value="Impact">Impact</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-2">Tamano: <span id="prop-fontsize-val" class="text-white">16</span>px</label>
+                                <input type="range" id="prop-fontsize" min="8" max="72" value="16" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                            </div>
+                        </div>
+                        <button id="btn-delete-field" class="w-full mt-4 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-medium transition">
+                            <i class="fa-solid fa-trash mr-2"></i>Eliminar campo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 3 -->
+        <section id="step3" class="mb-10 hidden">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold">3</div>
+                <h2 class="text-xl font-semibold">Exporta tu certificado</h2>
+            </div>
+            <div class="bg-gray-900 rounded-2xl p-6">
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Nombre del archivo</label>
+                        <input type="text" id="filename-input" value="mi-certificado" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none">
+                    </div>
+                    <div class="flex items-end">
+                        <button id="btn-download" class="w-full px-6 py-3 bg-green-600 hover:bg-green-500 rounded-xl font-bold text-lg transition">
+                            <i class="fa-solid fa-download mr-2"></i>Descargar HTML
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="preview-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-900 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+            <div class="flex items-center justify-between p-4 border-b border-gray-800">
+                <h3 class="font-semibold text-lg">Vista Previa</h3>
+                <button id="btn-close-preview" class="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="preview-content" class="p-6 text-center"></div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var state = {
+            image: null,
+            imageW: 0,
+            imageH: 0,
+            fields: [],
+            selectedType: 'name',
+            selectedFieldId: null,
+            zoom: 100,
+            idCounter: 0
+        };
+
+        var els = {};
+        var typeBtns = document.querySelectorAll('.type-btn');
+
+        function init() {
+            els.dropZone = document.getElementById('drop-zone');
+            els.imageInput = document.getElementById('image-input');
+            els.uploadPrompt = document.getElementById('upload-prompt');
+            els.loading = document.getElementById('loading');
+            els.previewContainer = document.getElementById('preview-container');
+            els.previewImg = document.getElementById('preview-img');
+            els.step1 = document.getElementById('step1');
+            els.step2 = document.getElementById('step2');
+            els.step3 = document.getElementById('step3');
+            els.templateImg = document.getElementById('template-img');
+            els.fieldsLayer = document.getElementById('fields-layer');
+            els.canvasContainer = document.getElementById('canvas-container');
+            els.zoomSlider = document.getElementById('zoom-slider');
+            els.zoomVal = document.getElementById('zoom-val');
+            els.btnExport = document.getElementById('btn-export');
+            els.btnBack = document.getElementById('btn-back');
+            els.btnPreview = document.getElementById('btn-preview');
+            els.btnDownload = document.getElementById('btn-download');
+            els.filenameInput = document.getElementById('filename-input');
+            els.previewModal = document.getElementById('preview-modal');
+            els.previewContent = document.getElementById('preview-content');
+            els.btnClosePreview = document.getElementById('btn-close-preview');
+
+            els.fieldProps = document.getElementById('field-props');
+            els.propType = document.getElementById('prop-type');
+            els.propW = document.getElementById('prop-w');
+            els.propH = document.getElementById('prop-h');
+            els.propWVal = document.getElementById('prop-w-val');
+            els.propHVal = document.getElementById('prop-h-val');
+            els.propColor = document.getElementById('prop-color');
+            els.propColorText = document.getElementById('prop-color-text');
+            els.propFont = document.getElementById('prop-font');
+            els.propFontsize = document.getElementById('prop-fontsize');
+            els.propFontsizeVal = document.getElementById('prop-fontsize-val');
+            els.textProps = document.getElementById('text-props');
+            els.btnDeleteField = document.getElementById('btn-delete-field');
+
+            els.imageInput.addEventListener('change', onFileSelect);
+
+            els.dropZone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                els.dropZone.classList.add('dragover');
+            });
+            els.dropZone.addEventListener('dragleave', function() {
+                els.dropZone.classList.remove('dragover');
+            });
+            els.dropZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                els.dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files[0]) {
+                    loadImage(e.dataTransfer.files[0]);
+                }
+            });
+
+            typeBtns.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    selectType(btn.dataset.type);
+                });
+            });
+
+            els.zoomSlider.addEventListener('input', onZoomChange);
+            els.btnExport.addEventListener('click', onExport);
+            els.btnPreview.addEventListener('click', showPreview);
+            els.btnClosePreview.addEventListener('click', function() {
+                els.previewModal.classList.add('hidden');
+            });
+            els.btnDownload.addEventListener('click', onExport);
+
+            els.templateImg.addEventListener('click', onCanvasClick);
+
+            els.propW.addEventListener('input', onPropChange);
+            els.propH.addEventListener('input', onPropChange);
+            els.propColor.addEventListener('input', onPropColorChange);
+            els.propColorText.addEventListener('input', onPropColorTextChange);
+            els.propFont.addEventListener('change', onPropChange);
+            els.propFontsize.addEventListener('input', onPropChange);
+            els.btnDeleteField.addEventListener('click', deleteSelectedField);
+            els.btnBack.addEventListener('click', goBack);
+        }
+
+        function goBack() {
+            if (!els.step2.classList.contains('hidden')) {
+                els.step2.classList.add('hidden');
+                els.step1.classList.remove('hidden');
+                els.btnBack.classList.add('hidden');
+                els.btnExport.disabled = true;
+                els.btnPreview.classList.add('hidden');
+                els.previewContainer.classList.add('hidden');
+                els.uploadPrompt.classList.remove('hidden');
+                els.templateImg.src = '';
+                els.templateImg.onload = null;
+                els.previewImg.src = '';
+                state.image = null;
+                state.fields = [];
+                state.selectedFieldId = null;
+                state.idCounter = 0;
+                els.fieldProps.classList.add('hidden');
+                renderFields();
+            } else if (!els.step3.classList.contains('hidden')) {
+                els.step3.classList.add('hidden');
+                els.step2.classList.remove('hidden');
+                els.btnBack.classList.remove('hidden');
+            }
+        }
+
+        function onFileSelect(e) {
+            var file = e.target.files[0];
+            if (file) loadImage(file);
+        }
+
+        function loadImage(file) {
+            els.uploadPrompt.classList.add('hidden');
+            els.previewContainer.classList.add('hidden');
+            els.loading.classList.remove('hidden');
+
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                state.image = e.target.result;
+                els.previewImg.src = state.image;
+                els.templateImg.src = state.image;
+                els.templateImg.onload = function() {
+                    els.loading.classList.add('hidden');
+                    els.previewContainer.classList.remove('hidden');
+                    goToStep2();
+                };
+            };
+            reader.onerror = function() {
+                els.loading.classList.add('hidden');
+                els.uploadPrompt.classList.remove('hidden');
+                alert('Error al cargar la imagen');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function goToStep2() {
+            state.imageW = els.templateImg.naturalWidth;
+            state.imageH = els.templateImg.naturalHeight;
+            requestAnimationFrame(function() {
+                updateFieldsLayer();
+            });
+            els.step1.classList.add('hidden');
+            els.step2.classList.remove('hidden');
+            els.btnExport.disabled = false;
+            els.btnPreview.classList.remove('hidden');
+            els.btnBack.classList.remove('hidden');
+        }
+
+        function onZoomChange() {
+            state.zoom = parseInt(els.zoomSlider.value);
+            els.zoomVal.textContent = state.zoom + '%';
+            updateFieldsLayer();
+        }
+
+        function updateFieldsLayer() {
+            var w = els.templateImg.offsetWidth;
+            var h = els.templateImg.offsetHeight;
+            els.fieldsLayer.style.width = w + 'px';
+            els.fieldsLayer.style.height = h + 'px';
+            renderFields();
+        }
+
+        function selectType(type) {
+            state.selectedType = type;
+            typeBtns.forEach(function(btn) {
+                if (btn.dataset.type === type) {
+                    btn.classList.add('ring-2', 'ring-offset-2', 'ring-offset-gray-900');
+                    if (type === 'name') btn.classList.add('ring-blue-500');
+                    else if (type === 'photo') btn.classList.add('ring-green-500');
+                    else btn.classList.add('ring-purple-500');
+                } else {
+                    btn.classList.remove('ring-2', 'ring-offset-2', 'ring-offset-gray-900', 'ring-blue-500', 'ring-green-500', 'ring-purple-500');
+                }
+            });
+        }
+
+        function onCanvasClick(e) {
+            if (e.target !== els.templateImg) return;
+            var imgRect = els.templateImg.getBoundingClientRect();
+            var x = e.clientX - imgRect.left;
+            var y = e.clientY - imgRect.top;
+            addField(x, y);
+        }
+
+        function addField(x, y) {
+            var defaults = {
+                name: { w: 200, h: 40, color: '#ffffff', font: 'system-ui', fontsize: 16 },
+                photo: { w: 120, h: 120 },
+                category: { w: 180, h: 40, color: '#ffffff', font: 'system-ui', fontsize: 16 }
+            };
+            var d = defaults[state.selectedType];
+            var renderedW = els.templateImg.offsetWidth;
+            var renderedH = els.templateImg.offsetHeight;
+            var scaleX = state.imageW / renderedW;
+            var scaleY = state.imageH / renderedH;
+            var field = {
+                id: 'f' + (++state.idCounter),
+                type: state.selectedType,
+                x: Math.round(x * scaleX),
+                y: Math.round(y * scaleY),
+                w: d.w,
+                h: d.h,
+                color: d.color || '#ffffff',
+                font: d.font || 'system-ui',
+                fontsize: d.fontsize || 16
+            };
+            state.fields.push(field);
+            selectField(field.id);
+            renderFields();
+        }
+
+        function renderFields() {
+            var layer = els.fieldsLayer;
+            if (!state.imageW || !state.imageH) {
+                layer.innerHTML = '';
+                return;
+            }
+            var renderedW = els.templateImg.offsetWidth;
+            var renderedH = els.templateImg.offsetHeight;
+            var scaleX = renderedW / state.imageW;
+            var scaleY = renderedH / state.imageH;
+            layer.innerHTML = '';
+
+            state.fields.forEach(function(f) {
+                var el = document.createElement('div');
+                el.className = 'field-marker ' + f.type;
+                el.style.left = (f.x * scaleX) + 'px';
+                el.style.top = (f.y * scaleY) + 'px';
+                el.style.width = (f.w * scaleX) + 'px';
+                el.style.height = (f.h * scaleY) + 'px';
+                el.style.pointerEvents = 'auto';
+                if (f.id === state.selectedFieldId) el.classList.add('selected');
+
+                if (f.type === 'photo') {
+                    el.innerHTML = '<div class="text-center"><i class="fa-solid fa-camera text-green-400"></i></div>';
+                } else {
+                    el.innerHTML = '<div class="text-center" style="color:' + f.color + ';font-family:' + f.font + ';font-size:' + f.fontsize + 'px;"><i class="fa-solid fa-pen text-blue-400"></i></div>';
+                }
+
+                el.addEventListener('mousedown', function(e) {
+                    startDrag(e, el, f);
+                });
+
+                el.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    selectField(f.id);
+                });
+
+                layer.appendChild(el);
+            });
+        }
+
+        function startDrag(e, el, field) {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            var renderedW = els.templateImg.offsetWidth;
+            var renderedH = els.templateImg.offsetHeight;
+            var scaleX = state.imageW / renderedW;
+            var scaleY = state.imageH / renderedH;
+            var fieldRenderedX = field.x / scaleX;
+            var fieldRenderedY = field.y / scaleY;
+            var startMouseX = e.clientX;
+            var startMouseY = e.clientY;
+
+            function onMove(e) {
+                var dx = e.clientX - startMouseX;
+                var dy = e.clientY - startMouseY;
+                var newFieldRenderedX = fieldRenderedX + dx;
+                var newFieldRenderedY = fieldRenderedY + dy;
+                field.x = Math.max(0, Math.min(state.imageW - field.w, Math.round(newFieldRenderedX * scaleX)));
+                field.y = Math.max(0, Math.min(state.imageH - field.h, Math.round(newFieldRenderedY * scaleY)));
+                renderFields();
+            }
+
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        }
+
+        function selectField(id) {
+            state.selectedFieldId = id;
+            var field = state.fields.find(function(f) { return f.id === id; });
+            if (!field) {
+                els.fieldProps.classList.add('hidden');
+                return;
+            }
+            els.fieldProps.classList.remove('hidden');
+            var typeLabels = { name: 'Nombre', photo: 'Foto', category: 'Categoria' };
+            els.propType.textContent = typeLabels[field.type];
+            els.propW.value = field.w;
+            els.propH.value = field.h;
+            els.propWVal.textContent = field.w;
+            els.propHVal.textContent = field.h;
+            if (field.type !== 'photo') {
+                els.textProps.classList.remove('hidden');
+                els.propColor.value = field.color;
+                els.propColorText.value = field.color;
+                els.propFont.value = field.font;
+                els.propFontsize.value = field.fontsize;
+                els.propFontsizeVal.textContent = field.fontsize;
+            } else {
+                els.textProps.classList.add('hidden');
+            }
+            renderFields();
+        }
+
+        function onPropChange() {
+            var field = state.fields.find(function(f) { return f.id === state.selectedFieldId; });
+            if (!field) return;
+            field.w = parseInt(els.propW.value) || field.w;
+            field.h = parseInt(els.propH.value) || field.h;
+            els.propWVal.textContent = field.w;
+            els.propHVal.textContent = field.h;
+            if (field.type !== 'photo') {
+                field.font = els.propFont.value;
+                field.fontsize = parseInt(els.propFontsize.value) || field.fontsize;
+                els.propFontsizeVal.textContent = field.fontsize;
+            }
+            renderFields();
+        }
+
+        function onPropColorChange() {
+            var field = state.fields.find(function(f) { return f.id === state.selectedFieldId; });
+            if (!field || field.type === 'photo') return;
+            field.color = els.propColor.value;
+            els.propColorText.value = field.color;
+            renderFields();
+        }
+
+        function onPropColorTextChange() {
+            var field = state.fields.find(function(f) { return f.id === state.selectedFieldId; });
+            if (!field || field.type === 'photo') return;
+            field.color = els.propColorText.value;
+            els.propColor.value = field.color;
+            renderFields();
+        }
+
+        function deleteSelectedField() {
+            if (!state.selectedFieldId) return;
+            state.fields = state.fields.filter(function(f) { return f.id !== state.selectedFieldId; });
+            state.selectedFieldId = null;
+            els.fieldProps.classList.add('hidden');
+            renderFields();
+        }
+
+        function showPreview() {
+            var html = '<div class="inline-block relative" style="max-width:500px;"><img src="' + state.image + '" class="max-w-full rounded shadow-2xl">';
+            state.fields.forEach(function(f) {
+                var colors = { name: 'bg-blue-500/60', photo: 'bg-green-500/60', category: 'bg-purple-500/60' };
+                html += '<div class="absolute ' + colors[f.type] + ' rounded flex items-center justify-center" style="left:' + (f.x/state.imageW*100) + '%;top:' + (f.y/state.imageH*100) + '%;width:' + (f.w/state.imageW*100) + '%;height:' + (f.h/state.imageH*100) + '%;">';
+                if (f.type === 'photo') html += '<i class="fa-solid fa-camera text-white"></i>';
+                html += '</div>';
+            });
+            html += '</div>';
+            els.previewContent.innerHTML = html;
+            els.previewModal.classList.remove('hidden');
+        }
+
+        function onExport() {
+            els.step2.classList.add('hidden');
+            els.step3.classList.remove('hidden');
+            els.btnBack.classList.add('hidden');
+            els.step3.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        document.getElementById('btn-download').addEventListener('click', function() {
+            exportHTML();
+        });
+
+        function exportHTML() {
+            var filename = els.filenameInput.value.trim() || 'certificado';
+            filename = filename.replace(/[^a-z0-9\-_]/gi, '_');
+
+            var fields = state.fields;
+            var image = state.image;
+            var w = state.imageW;
+            var h = state.imageH;
+
+            var fieldHTML = '';
+            var fieldHTMLInit = '[';
+            for (var i = 0; i < fields.length; i++) {
+                var f = fields[i];
+                var style = 'left:' + (f.x/w*100) + '%;top:' + (f.y/h*100) + '%;width:' + (f.w/w*100) + '%;height:' + (f.h/h*100) + '%;';
+                if (f.type === 'photo') {
+                    fieldHTML += '<div class="field-overlay photo" id="field-' + f.id + '" style="' + style + '"><button type="button" onclick="document.getElementById(\'photo-inp-' + f.id + '\').click()" class="w-full h-full flex items-center justify-center text-green-400"><i class="fa-solid fa-camera text-2xl"></i></button><input type="file" id="photo-inp-' + f.id + '" accept="image/*" class="hidden" onchange="handlePhoto(this,\'' + f.id + '\')"></div>';
+                } else {
+                    var ph = f.type === 'name' ? 'Escribi tu nombre' : 'Categoria / Premio';
+                    fieldHTML += '<div class="field-overlay ' + f.type + '" style="' + style + '"><input type="text" placeholder="' + ph + '" style="color:' + f.color + ';font-family:' + f.font + ';font-size:' + f.fontsize + 'px;" onfocus="save()" onblur="save()"></div>';
+                }
+                fieldHTMLInit += '"' + f.id + '",';
+            }
+            fieldHTMLInit = fieldHTMLInit.slice(0, -1) + ']';
+
+            var photoFieldHTML = '';
+            for (var i = 0; i < fields.length; i++) {
+                var fid = fields[i].id;
+                if (fields[i].type === 'photo') {
+                    photoFieldHTML += 'photodata["' + fid + '"]=null;';
+                }
+            }
+            if (photoFieldHTML.length > 0) {
+                photoFieldHTML = photoFieldHTML.substring(0, photoFieldHTML.length - 1);
+            }
+
+            var saveStateCode = '';
+            for (var i = 0; i < fields.length; i++) {
+                if (fields[i].type !== 'photo') {
+                    saveStateCode += 'd.field_' + fields[i].id + '=document.querySelector("#field-' + fields[i].id + ' input").value;';
+                }
+            }
+            for (var i = 0; i < fields.length; i++) {
+                if (fields[i].type === 'photo') {
+                    saveStateCode += 'if(photodata["' + fields[i].id + '"]){d["p' + fields[i].id + '"]=photodata["' + fields[i].id + '"];}';
+                }
+            }
+
+            var loadStateCode = '';
+            for (var i = 0; i < fields.length; i++) {
+                var fid = fields[i].id;
+                if (fields[i].type === 'photo') {
+                    loadStateCode += 'if(data["p' + fid + '"]){var el=document.getElementById("field-' + fid + '");el.innerHTML=\'<img src="\'+data["p' + fid + '"]+\'" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">\';photodata["' + fid + '"]=data["p' + fid + '"];}';
+                } else {
+                    loadStateCode += 'if(data["' + fid + '"]){var inp=document.querySelector("#field-' + fid + ' input");inp.value=data["' + fid + '"];inp.style.color=data["c' + fid + '"];inp.style.fontFamily=data["f' + fid + '"];inp.style.fontSize=data["s' + fid + '"]+"px";}';
+                }
+            }
+
+            var exportDataCode = '';
+            for (var i = 0; i < fields.length; i++) {
+                if (fields[i].type === 'photo') {
+                    exportDataCode += (exportDataCode ? ',' : '') + '"p' + fields[i].id + '":photodata["' + fields[i].id + '"]';
+                } else {
+                    exportDataCode += (exportDataCode ? ',' : '') + '"' + fields[i].id + '":document.querySelector("#field-' + fields[i].id + ' input").value';
+                    exportDataCode += ',"c' + fields[i].id + '":document.querySelector("#field-' + fields[i].id + ' input").style.color';
+                    exportDataCode += ',"f' + fields[i].id + '":document.querySelector("#field-' + fields[i].id + ' input").style.fontFamily';
+                    exportDataCode += ',"s' + fields[i].id + '":parseInt(document.querySelector("#field-' + fields[i].id + ' input").style.fontSize)';
+                }
+            }
+
+            var photoDataCode = '';
+            for (var i = 0; i < fields.length; i++) {
+                if (fields[i].type === 'photo') {
+                    photoDataCode += 'photodata["' + fields[i].id + '"]=null;';
+                }
+            }
+
+            var resetHTML = '';
+            for (var i = 0; i < fields.length; i++) {
+                var fid = fields[i].id;
+                if (fields[i].type === 'photo') {
+                    resetHTML += 'document.getElementById("field-' + fid + '").innerHTML=\'<button type="button" onclick="document.getElementById(\'photo-inp-' + fid + '\').click()" class="w-full h-full flex items-center justify-center text-green-400"><i class="fa-solid fa-camera text-2xl"></i></button><input type="file" id="photo-inp-' + fid + '" accept="image/*" class="hidden" onchange="handlePhoto(this,\'' + fid + '\')">\';';
+                } else {
+                    resetHTML += 'document.querySelector("#field-' + fid + ' input").value="";';
+                }
+            }
+
+            var exportCode = '';
+            for (var i = 0; i < fields.length; i++) {
+                exportCode += (exportCode ? ',' : '') + '"' + (fields[i].type === 'photo' ? 'p' : '') + fields[i].id + '":' + (fields[i].type === 'photo' ? 'photodata["' + fields[i].id + '"]' : 'document.querySelector("#field-' + fields[i].id + ' input").value');
+            }
+
+            var htmlArr = [];
+            htmlArr.push('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + filename + '</title><script src="https://cdn.tailwindcss.com"><\/script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"><style>body{background:#111;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;font-family:system-ui,sans-serif}.cert-container{position:relative;display:inline-block;line-height:0;max-width:100%}.cert-container img{max-width:100%;height:auto;border-radius:8px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5)}.field-overlay{position:absolute;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer}.field-overlay input{background:transparent;border:none;text-align:center;color:white;width:100%;height:100%;outline:none}.field-overlay.name{background:rgba(59,130,246,0.2);border:2px dashed rgba(59,130,246,0.5)}.field-overlay.photo{background:rgba(34,197,94,0.2);border:2px dashed rgba(34,197,94,0.5)}.field-overlay.photo button{display:block}.field-overlay.photo input{display:none}.field-overlay.category{background:rgba(168,85,247,0.2);border:2px dashed rgba(168,85,247,0.5)}.actions{margin-top:2rem;display:flex;gap:1rem}.btn{padding:0.75rem 1.5rem;border-radius:0.75rem;font-weight:600;cursor:pointer;border:none}.btn-save{background:#3b82f6;color:white}.btn-reset{background:#374151;color:white}.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);padding:1rem 1.5rem;background:#22c55e;color:white;border-radius:0.75rem;opacity:0;transition:opacity 0.3s}.toast.show{opacity:1}<\/style><\/head><body><h1 style="color:#fff;margin-bottom:1.5rem;font-size:1.5rem;font-weight:700;">Certificado</h1>');
+            htmlArr.push('<div class="cert-container"><img src="');
+            htmlArr.push(image);
+            htmlArr.push('">');
+            htmlArr.push(fieldHTML);
+            htmlArr.push('</div>');
+            htmlArr.push('<div class="actions"><button class="btn btn-save" onclick="exportData()"><i class="fa-solid fa-floppy-disk"></i> Guardar</button><button class="btn btn-reset" onclick="resetData()"><i class="fa-solid fa-rotate-left"></i> Reset</button></div>');
+            htmlArr.push('<div class="toast" id="toast">Guardado!</div>');
+            htmlArr.push('<script>var STORAGE_KEY="' + filename + '";var photodata={};' + photoFieldHTML + ';function save(){var d={};' + saveStateCode + 'localStorage.setItem(STORAGE_KEY,JSON.stringify(d));}function load(){var s=localStorage.getItem(STORAGE_KEY);if(!s)return;var data=JSON.parse(s);' + loadStateCode + '}function exportData(){var d={' + exportDataCode + '};var blob=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="' + filename + '_data.json";a.click();showToast("Datos exportados!");}function resetData(){if(!confirm("Resetear?"))return;localStorage.removeItem(STORAGE_KEY);' + photoDataCode + resetHTML + 'showToast("Reseteado!");}function handlePhoto(input,id){var file=input.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(e){photodata[id]=e.target.result;var el=document.getElementById("field-"+id);el.innerHTML=\'<img src="\'+e.target.result+\'" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">\';save();};reader.readAsDataURL(file);}function showToast(m){var t=document.getElementById("toast");t.textContent=m;t.classList.add("show");setTimeout(function(){t.classList.remove("show")},2000);}load();' + '<' + '/script><' + '/body><' + '/html>');
+            var html = htmlArr.join('');
+
+            var blob = new Blob([html], { type: 'text/html' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = filename + '.html';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        init();
+    })();
+    </script>
+</body>
+</html>
